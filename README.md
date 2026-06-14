@@ -1,4 +1,3 @@
-# VitalStream 
 # VitalStream
 
 Real-time ICU patient monitoring system that streams patient vital signs through Apache Kafka, computes clinical risk scores using Apache Spark, stores results in PostgreSQL, and displays a live ward dashboard with a FastAPI backend and Streamlit frontend.
