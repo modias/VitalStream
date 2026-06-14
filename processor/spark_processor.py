@@ -13,6 +13,18 @@ from pyspark.sql.types import (
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 INPUT_TOPIC = os.getenv("KAFKA_INPUT_TOPIC", "vitals")
 
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "vitalstream")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "vitalstream")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "vitalstream")
+POSTGRES_TABLE = "vitals_scores"
+
+JDBC_PACKAGES = (
+    "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.2,"
+    "org.postgresql:postgresql:42.7.3"
+)
+
 VITAL_SCHEMA = StructType([
     StructField("patient_id", StringType()),
     StructField("timestamp", StringType()),
@@ -25,10 +37,7 @@ def build_spark() -> SparkSession:
     return (
         SparkSession.builder
         .appName("VitalStream-NEWS2")
-        .config(
-            "spark.jars.packages",
-            "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.2",
-        )
+        .config("spark.jars.packages", JDBC_PACKAGES)
         .getOrCreate()
     )
 
@@ -91,6 +100,31 @@ def risk_level(score_col):
     )
 
 
+def jdbc_url() -> str:
+    return (
+        f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    )
+
+
+def write_batch(batch_df, batch_id: int) -> None:
+    if batch_df.isEmpty():
+        return
+
+    batch_df.show(truncate=False)
+
+    (
+        batch_df.write
+        .format("jdbc")
+        .option("url", jdbc_url())
+        .option("dbtable", POSTGRES_TABLE)
+        .option("user", POSTGRES_USER)
+        .option("password", POSTGRES_PASSWORD)
+        .option("driver", "org.postgresql.Driver")
+        .mode("append")
+        .save()
+    )
+
+
 def main():
     spark = build_spark()
     spark.sparkContext.setLogLevel("WARN")
@@ -138,7 +172,7 @@ def main():
         )
         .withColumn("risk_level", risk_level(col("news2_score")))
         .select(
-            col("patient_id"),
+            col("patient_id").cast("integer").alias("patient_id"),
             col("window.start").alias("window_start"),
             col("news2_score"),
             col("risk_level"),
@@ -153,8 +187,7 @@ def main():
     query = (
         scored.writeStream
         .outputMode("append")
-        .format("console")
-        .option("truncate", False)
+        .foreachBatch(write_batch)
         .start()
     )
 

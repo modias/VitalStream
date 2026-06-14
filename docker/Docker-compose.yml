@@ -24,3 +24,18 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  postgres:
+    image: postgres:16
+    container_name: vitalstream-postgres
+    environment:
+      POSTGRES_USER: vitalstream
+      POSTGRES_PASSWORD: vitalstream
+      POSTGRES_DB: vitalstream
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
