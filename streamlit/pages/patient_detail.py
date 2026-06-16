@@ -1,6 +1,6 @@
 import streamlit as st
 
-from app import (
+from common import (
     MOCK_PATIENT_CHARTS,
     inject_styles,
     render_header,
