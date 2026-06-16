@@ -1079,6 +1079,26 @@ def split_problem(problem: str) -> tuple[str, str]:
     return problem, problem
 
 
+def build_likely_causes_summary(problems: list[dict]) -> str | None:
+    cause_lines = [
+        assessment["causes"]
+        for assessment in problems
+        if assessment.get("causes")
+    ]
+    if not cause_lines:
+        return None
+
+    unique_causes: list[str] = []
+    seen: set[str] = set()
+    for line in cause_lines:
+        text = line.replace("Likely causes: ", "").strip()
+        if text.lower() not in seen:
+            seen.add(text.lower())
+            unique_causes.append(text)
+
+    return "; ".join(unique_causes)
+
+
 def build_medical_narrative(problems: list[dict]) -> str:
     sorted_problems = sorted(problems, key=lambda item: -item["score"])
     clauses = []
@@ -1093,23 +1113,11 @@ def build_medical_narrative(problems: list[dict]) -> str:
     else:
         opening = f"Patient presents with {', '.join(clauses[:-1])}, and {clauses[-1]}."
 
-    cause_lines = [
-        assessment["causes"]
-        for assessment in sorted_problems
-        if assessment.get("causes")
-    ]
-    if not cause_lines:
+    likely_causes = build_likely_causes_summary(sorted_problems)
+    if not likely_causes:
         return opening
 
-    unique_causes: list[str] = []
-    seen: set[str] = set()
-    for line in cause_lines:
-        text = line.replace("Likely causes: ", "").strip()
-        if text.lower() not in seen:
-            seen.add(text.lower())
-            unique_causes.append(text)
-
-    return f"{opening} Likely contributing factors: {'; '.join(unique_causes)}."
+    return f"{opening} Likely contributing factors: {likely_causes}."
 
 
 def build_plain_english_summary(problems: list[dict]) -> str:
@@ -1142,13 +1150,19 @@ def render_active_problem_panel(
 
     medical = build_medical_narrative(problems)
     plain = build_plain_english_summary(problems)
+    likely_causes = build_likely_causes_summary(problems)
+    likely_causes_html = ""
+    if likely_causes:
+        likely_causes_html = f"""
+            <p class="active-problem-plain-label">What it might be</p>
+            <p class="active-problem-plain">{likely_causes}</p>"""
     st.markdown(
         f"""
         <div class="active-problem-panel">
             <h4>Active Problem (NEWS2 {news2_score} — {risk_level})</h4>
             <p class="active-problem-medical">{medical}</p>
             <p class="active-problem-plain-label">In plain English</p>
-            <p class="active-problem-plain">{plain}</p>
+            <p class="active-problem-plain">{plain}</p>{likely_causes_html}
         </div>
         """,
         unsafe_allow_html=True,
