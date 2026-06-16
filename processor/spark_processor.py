@@ -4,7 +4,7 @@
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    col, from_json, window, max as spark_max, when, lit
+    col, from_json, window, max as spark_max, when, lit, to_timestamp
 )
 from pyspark.sql.types import (
     StructType, StructField, StringType, DoubleType
@@ -142,12 +142,12 @@ def main():
         raw
         .select(from_json(col("value").cast("string"), VITAL_SCHEMA).alias("v"))
         .select("v.*")
-        .withColumn("event_time", col("timestamp").cast("timestamp"))
+        .withColumn("event_time", to_timestamp(col("timestamp")))
     )
 
     windowed = (
         vitals
-        .withWatermark("event_time", "10 minutes")
+        .withWatermark("event_time", "1 minute")
         .groupBy(
             window(col("event_time"), "5 minutes"),
             col("patient_id"),

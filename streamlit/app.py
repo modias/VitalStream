@@ -14,7 +14,7 @@ def main() -> None:
     if "vitals_patient_id" not in st.session_state:
         st.session_state.vitals_patient_id = None
     if "use_mock_data" not in st.session_state:
-        st.session_state.use_mock_data = True
+        st.session_state.use_mock_data = False
 
     with st.sidebar:
         st.header("Settings")

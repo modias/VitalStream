@@ -1012,9 +1012,10 @@ def get_patient_select_entries() -> list[dict]:
             patient_id = patient["patient_id"]
             score = patient.get("news2_score", "—")
             risk = patient.get("risk_level", "LOW")
+            name = patient.get("full_name") or f"Patient {patient_id}"
             entries.append({
                 "patient_id": patient_id,
-                "label": f"Patient {patient_id} ({score})",
+                "label": f"{name} ({score})",
                 "color": risk_text_color(risk),
             })
     return entries
@@ -1150,19 +1151,13 @@ def render_active_problem_panel(
 
     medical = build_medical_narrative(problems)
     plain = build_plain_english_summary(problems)
-    likely_causes = build_likely_causes_summary(problems)
-    likely_causes_html = ""
-    if likely_causes:
-        likely_causes_html = f"""
-            <p class="active-problem-plain-label">What it might be</p>
-            <p class="active-problem-plain">{likely_causes}</p>"""
     st.markdown(
         f"""
         <div class="active-problem-panel">
             <h4>Active Problem (NEWS2 {news2_score} — {risk_level})</h4>
             <p class="active-problem-medical">{medical}</p>
             <p class="active-problem-plain-label">In plain English</p>
-            <p class="active-problem-plain">{plain}</p>{likely_causes_html}
+            <p class="active-problem-plain">{plain}</p>
         </div>
         """,
         unsafe_allow_html=True,

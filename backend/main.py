@@ -18,12 +18,13 @@ def active_patients() -> list[dict[str, Any]]:
     query = """
         SELECT DISTINCT ON (v.patient_id)
             v.patient_id,
+            p.full_name,
             v.news2_score,
             v.risk_level,
             v.window_start,
             p.room_number
         FROM vitals_scores v
-        LEFT JOIN patients p ON p.patient_id = v.patient_id
+        INNER JOIN patients p ON p.patient_id = v.patient_id
         ORDER BY v.patient_id, v.window_start DESC
     """
     with get_connection() as conn:
