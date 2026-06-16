@@ -16,13 +16,15 @@ def health() -> dict[str, str]:
 @app.get("/api/patients/active")
 def active_patients() -> list[dict[str, Any]]:
     query = """
-        SELECT DISTINCT ON (patient_id)
-            patient_id,
-            news2_score,
-            risk_level,
-            window_start
-        FROM vitals_scores
-        ORDER BY patient_id, window_start DESC
+        SELECT DISTINCT ON (v.patient_id)
+            v.patient_id,
+            v.news2_score,
+            v.risk_level,
+            v.window_start,
+            p.room_number
+        FROM vitals_scores v
+        LEFT JOIN patients p ON p.patient_id = v.patient_id
+        ORDER BY v.patient_id, v.window_start DESC
     """
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -56,3 +58,39 @@ def patient_vitals_history(patient_id: int) -> list[dict[str, Any]]:
             rows = cur.fetchall()
 
     return [dict(row) for row in rows]
+
+
+@app.get("/api/patients/{patient_id}/profile")
+def patient_profile(patient_id: int) -> dict[str, Any]:
+    query = """
+        SELECT
+            patient_id,
+            full_name,
+            room_number,
+            date_of_birth,
+            sex,
+            allergies,
+            past_medical_conditions,
+            medical_history,
+            current_medications,
+            home_address,
+            occupation,
+            updated_at
+        FROM patients
+        WHERE patient_id = %s
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, (patient_id,))
+            row = cur.fetchone()
+
+    if row is None:
+        return {"patient_id": patient_id, "found": False}
+
+    profile = dict(row)
+    profile["found"] = True
+    if profile.get("date_of_birth") is not None:
+        profile["date_of_birth"] = profile["date_of_birth"].isoformat()
+    if profile.get("updated_at") is not None:
+        profile["updated_at"] = profile["updated_at"].isoformat()
+    return profile
