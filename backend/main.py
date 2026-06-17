@@ -8,6 +8,18 @@ from backend.database.postgres import get_connection
 app = FastAPI()
 
 
+def fahrenheit_to_celsius(f: float) -> float:
+    return round((f - 32) * 5 / 9, 1)
+
+
+def convert_vitals_row(row: dict[str, Any]) -> dict[str, Any]:
+    result = dict(row)
+    temp = result.get("temperature")
+    if temp is not None:
+        result["temperature"] = fahrenheit_to_celsius(float(temp))
+    return result
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -58,7 +70,7 @@ def patient_vitals_history(patient_id: int) -> list[dict[str, Any]]:
             cur.execute(query, (patient_id,))
             rows = cur.fetchall()
 
-    return [dict(row) for row in rows]
+    return [convert_vitals_row(dict(row)) for row in rows]
 
 
 @app.get("/api/patients/{patient_id}/profile")

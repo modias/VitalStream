@@ -58,7 +58,7 @@ NORMAL_VITALS = {
     "respiratory_rate": 16.0,
     "spo2": 98.0,
     "systolic_bp": 118.0,
-    "temperature": 37.0,
+    "temperature": 98.6,  # 37.0°C stored as Fahrenheit in DB
 }
 
 TEST_PATIENTS = [
@@ -210,7 +210,7 @@ def scenario_respiratory_failure(
             "respiratory_rate": round(lerp(18, 32, minute, total_minutes - 1), 1),
             "heart_rate": round(lerp(75, 125, minute, total_minutes - 1), 1),
             "systolic_bp": 118.0,
-            "temperature": 37.1,
+            "temperature": 98.8,  # 37.1°C
         }
         send_vitals(producer, patient_id, now_local(), vitals)
         if minute < total_minutes - 1:
@@ -231,7 +231,7 @@ def scenario_sepsis(
         if stop_event.is_set():
             return
         vitals = {
-            "temperature": round(lerp(37.0, 39.8, minute, sepsis_minutes - 1), 2),
+            "temperature": round(lerp(98.6, 103.6, minute, sepsis_minutes - 1), 2),
             "heart_rate": round(lerp(80, 135, minute, sepsis_minutes - 1), 1),
             "systolic_bp": round(lerp(120, 88, minute, sepsis_minutes - 1), 1),
             "respiratory_rate": round(lerp(16, 26, minute, sepsis_minutes - 1), 1),
@@ -255,7 +255,7 @@ def scenario_cardiac(
         "systolic_bp": 85.0,
         "spo2": 91.0,
         "respiratory_rate": 28.0,
-        "temperature": 37.0,
+        "temperature": 98.6,
     }
     logger.info("Scenario 3 — Cardiac Event — patient %s started", patient_id)
     send_vitals(producer, patient_id, now_local(), cardiac_vitals)

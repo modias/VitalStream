@@ -15,7 +15,7 @@ VITAL_RANGES = {
     "respiratory_rate": {"label": "Resp Rate (/min)", "low": 12, "high": 20},
     "spo2": {"label": "SpO₂ (%)", "low": 95, "high": 100},
     "systolic_bp": {"label": "Systolic BP (mmHg)", "low": 90, "high": 140},
-    "temperature": {"label": "Temperature (°C)", "low": 36.1, "high": 37.2},
+    "temperature": {"label": "Temperature (°C)", "low": 36.1, "high": 38.0},
 }
 
 VITAL_DESCRIPTIONS = {
@@ -541,12 +541,34 @@ def inject_styles() -> None:
             color: var(--vs-text-muted);
             margin: 1rem 0 0.35rem 0;
         }
+        .active-problem-causes-label {
+            font-size: 0.95rem;
+            line-height: 1.55;
+            color: var(--vs-problems-text);
+            margin: 0.75rem 0 0.35rem 0;
+        }
+        .active-problem-causes {
+            margin: 0;
+            padding-left: 1.25rem;
+            color: var(--vs-problems-text);
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+        .active-problem-causes li {
+            margin-bottom: 0.2rem;
+        }
         .active-problem-plain {
             font-size: 0.88rem;
             line-height: 1.5;
             color: var(--vs-problems-cause);
             margin: 0;
             font-style: italic;
+        }
+        .active-problem-plain p {
+            margin: 0 0 0.35rem 0;
+        }
+        .active-problem-plain p:last-child {
+            margin-bottom: 0;
         }
         .active-problem-ok {
             border: 1px solid #28a745;
@@ -1080,49 +1102,65 @@ def split_problem(problem: str) -> tuple[str, str]:
     return problem, problem
 
 
-def build_likely_causes_summary(problems: list[dict]) -> str | None:
-    cause_lines = [
-        assessment["causes"]
-        for assessment in problems
-        if assessment.get("causes")
-    ]
-    if not cause_lines:
-        return None
-
+def collect_unique_causes(problems: list[dict]) -> list[str]:
     unique_causes: list[str] = []
     seen: set[str] = set()
-    for line in cause_lines:
-        text = line.replace("Likely causes: ", "").strip()
-        if text.lower() not in seen:
-            seen.add(text.lower())
-            unique_causes.append(text)
+    for assessment in problems:
+        causes = assessment.get("causes")
+        if not causes:
+            continue
+        text = causes.replace("Likely causes: ", "").strip()
+        for part in text.split(","):
+            cause = part.strip()
+            if cause and cause.lower() not in seen:
+                seen.add(cause.lower())
+                unique_causes.append(cause)
+    return unique_causes
 
+
+def build_likely_causes_summary(problems: list[dict]) -> str | None:
+    unique_causes = collect_unique_causes(problems)
+    if not unique_causes:
+        return None
     return "; ".join(unique_causes)
 
 
-def build_medical_narrative(problems: list[dict]) -> str:
-    sorted_problems = sorted(problems, key=lambda item: -item["score"])
+def format_likely_causes_html(causes: list[str]) -> str:
+    if not causes:
+        return ""
+    items = "".join(f"<li>{cause}</li>" for cause in causes)
+    return (
+        '<p class="active-problem-causes-label">Likely contributing factors:</p>'
+        f'<ul class="active-problem-causes">{items}</ul>'
+    )
+
+
+def build_medical_opening(problems: list[dict]) -> str:
     clauses = []
-    for assessment in sorted_problems:
+    for assessment in problems:
         medical, _ = split_problem(assessment["problem"])
         clauses.append(f"{medical} ({assessment['detail']})")
 
     if len(clauses) == 1:
-        opening = f"Patient presents with {clauses[0]}."
-    elif len(clauses) == 2:
-        opening = f"Patient presents with {clauses[0]} and {clauses[1]}."
-    else:
-        opening = f"Patient presents with {', '.join(clauses[:-1])}, and {clauses[-1]}."
+        return f"Patient presents with {clauses[0]}."
+    if len(clauses) == 2:
+        return f"Patient presents with {clauses[0]} and {clauses[1]}."
+    return f"Patient presents with {', '.join(clauses[:-1])}, and {clauses[-1]}."
 
-    likely_causes = build_likely_causes_summary(sorted_problems)
-    if not likely_causes:
+
+def build_medical_narrative(problems: list[dict]) -> str:
+    sorted_problems = sorted(problems, key=lambda item: -item["score"])
+    opening = build_medical_opening(sorted_problems)
+    causes = collect_unique_causes(sorted_problems)
+    if not causes:
         return opening
 
-    return f"{opening} Likely contributing factors: {likely_causes}."
+    bullets = "\n".join(f"  • {cause}" for cause in causes)
+    return f"{opening}\nLikely contributing factors:\n{bullets}"
 
 
-def build_plain_english_summary(problems: list[dict]) -> str:
-    sentences = []
+def build_plain_english_lines(problems: list[dict]) -> list[str]:
+    lines = []
     for assessment in sorted(problems, key=lambda item: -item["score"]):
         _, plain = split_problem(assessment["problem"])
         trend_note = ""
@@ -1131,9 +1169,19 @@ def build_plain_english_summary(problems: list[dict]) -> str:
         elif assessment["trend"] == "improving":
             trend_note = " but improving"
         sentence = plain[0].upper() + plain[1:] if plain else plain
-        sentences.append(f"{sentence}{trend_note}")
+        lines.append(f"{sentence}{trend_note}.")
+    return lines
 
-    return " ".join(f"{sentence}." for sentence in sentences)
+
+def build_plain_english_summary(problems: list[dict]) -> str:
+    return "\n".join(build_plain_english_lines(problems))
+
+
+def format_plain_english_html(lines: list[str]) -> str:
+    if not lines:
+        return ""
+    items = "".join(f"<p>{line}</p>" for line in lines)
+    return f'<div class="active-problem-plain">{items}</div>'
 
 
 def render_active_problem_panel(
@@ -1149,15 +1197,18 @@ def render_active_problem_panel(
         )
         return
 
-    medical = build_medical_narrative(problems)
-    plain = build_plain_english_summary(problems)
+    sorted_problems = sorted(problems, key=lambda item: -item["score"])
+    medical_opening = build_medical_opening(sorted_problems)
+    causes_html = format_likely_causes_html(collect_unique_causes(sorted_problems))
+    plain_html = format_plain_english_html(build_plain_english_lines(sorted_problems))
     st.markdown(
         f"""
         <div class="active-problem-panel">
             <h4>Active Problem (NEWS2 {news2_score} — {risk_level})</h4>
-            <p class="active-problem-medical">{medical}</p>
+            <p class="active-problem-medical">{medical_opening}</p>
+            {causes_html}
             <p class="active-problem-plain-label">In plain English</p>
-            <p class="active-problem-plain">{plain}</p>
+            {plain_html}
         </div>
         """,
         unsafe_allow_html=True,
