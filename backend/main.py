@@ -1,9 +1,10 @@
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from psycopg2.extras import RealDictCursor
 
 from backend.database.postgres import get_connection
+from backend.services.llm_analysis import get_llm_analysis
 
 app = FastAPI()
 
@@ -107,3 +108,14 @@ def patient_profile(patient_id: int) -> dict[str, Any]:
     if profile.get("updated_at") is not None:
         profile["updated_at"] = profile["updated_at"].isoformat()
     return profile
+
+
+@app.get("/api/patients/{patient_id}/llm-analysis")
+def patient_llm_analysis(patient_id: int) -> dict[str, str]:
+    try:
+        analysis = get_llm_analysis(patient_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"LLM analysis failed: {exc}") from exc
+    return {"analysis": analysis}

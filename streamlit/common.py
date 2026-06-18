@@ -1,3 +1,4 @@
+import html
 import json
 import urllib.error
 import urllib.request
@@ -235,6 +236,13 @@ def fetch_patient_profile(patient_id: int) -> dict | None:
     if not isinstance(data, dict) or not data.get("found", True):
         return None
     return data
+
+
+def fetch_llm_analysis(patient_id: int) -> str | None:
+    data = fetch_json(f"{API_BASE}/api/patients/{patient_id}/llm-analysis")
+    if isinstance(data, dict) and data.get("analysis"):
+        return data["analysis"]
+    return None
 
 
 def format_timestamp(value) -> str:
@@ -577,6 +585,23 @@ def inject_styles() -> None:
             background: #d4edda;
             color: #155724;
             margin-top: 0.5rem;
+        }
+        .llm-reasoning-panel {
+            border: 1px solid #2563eb;
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            background: #eff6ff;
+            margin-top: 1rem;
+        }
+        .llm-reasoning-panel h4 {
+            color: #1e40af;
+            margin: 0 0 0.75rem 0;
+        }
+        .llm-reasoning-panel p {
+            color: #1e3a8a;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            margin: 0;
         }
         .profile-screen {
             border: 1px solid var(--vs-border);
@@ -1215,6 +1240,33 @@ def render_active_problem_panel(
     )
 
 
+def render_llm_clinical_reasoning_panel(patient_id: int, risk_level: str) -> None:
+    if risk_level.upper() not in {"HIGH", "MEDIUM"}:
+        return
+
+    analysis = fetch_llm_analysis(patient_id)
+    if not analysis:
+        st.markdown(
+            '<div class="llm-reasoning-panel">'
+            "<h4>AI Clinical Reasoning</h4>"
+            "<p>Analysis unavailable. Check that the API and Ollama are running (ollama serve).</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    safe_analysis = html.escape(analysis)
+    st.markdown(
+        f"""
+        <div class="llm-reasoning-panel">
+            <h4>AI Clinical Reasoning</h4>
+            <p>{safe_analysis}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_vital_status(assessment: dict | None) -> None:
     if assessment is None:
         return
@@ -1411,6 +1463,7 @@ def render_vitals_history_page(patient_id: int) -> None:
             render_vital_status(assessment)
 
     render_active_problem_panel(assessments, news2_score, risk_level)
+    render_llm_clinical_reasoning_panel(patient_id, risk_level)
 
 
 def format_date(value) -> str:

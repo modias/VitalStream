@@ -4,3 +4,4 @@ fastapi>=0.115.0
 uvicorn>=0.32.0
 psycopg2-binary>=2.9.9
 streamlit>=1.32.0,<1.57
+ollama>=0.4.0
